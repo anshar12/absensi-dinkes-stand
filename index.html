@@ -190,21 +190,36 @@
         import { getFirestore, doc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, setLogLevel, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ====================================================================
-        // KONFIGURASI FIREBASE & ADMIN (Telah Diperbarui)
+        // KONFIGURASI FIREBASE & ADMIN (Telah Direvisi untuk Mengatasi Galat)
         // ====================================================================
 
-        // Ambil konfigurasi dari variabel global lingkungan Canvas
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            // KONFIGURASI FALLBACK (berdasarkan data user)
-            apiKey: "AIzaSyDPp4IeriXx2m-NpfxAJrxDd-pE2YqBef4",
-            authDomain: "absensi-dinkes-stand.firebaseapp.com",
-            projectId: "absensi-dinkes-stand",
-            storageBucket: "absensi-dinkes-stand.firebasestorage.app",
-            messagingSenderId: "458172993222",
-            appId: "1:458172993222:web:e3d29d93b5284e04df11c7",
-            measurementId: "G-FE5XXDBDPM"
-        };
-        
+        let firebaseConfig = {};
+        const DUMMY_API_KEY = "AIzaSyDPp4IeriXx2m-NpfxAJrxDd-pE2YqBef4"; // Digunakan jika gagal parsing config
+
+        try {
+            // Coba parsing konfigurasi dari variabel global
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } else {
+                 console.warn("Variabel __firebase_config tidak ditemukan. Menggunakan konfigurasi fallback.");
+                 // Fallback configuration based on typical app structure
+                 firebaseConfig = {
+                    apiKey: DUMMY_API_KEY, 
+                    authDomain: "absensi-dinkes-stand.firebaseapp.com",
+                    projectId: "absensi-dinkes-stand",
+                    // ... tambahkan properti lain sesuai kebutuhan
+                 };
+            }
+        } catch (e) {
+            console.error("Gagal parsing __firebase_config:", e);
+             // Fallback jika parsing JSON gagal
+            firebaseConfig = {
+                apiKey: DUMMY_API_KEY, 
+                authDomain: "absensi-dinkes-stand.firebaseapp.com",
+                projectId: "absensi-dinkes-stand",
+            };
+        }
+
         // Ambil app ID dari variabel global atau fallback ke projectId
         const currentAppId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
 
@@ -213,7 +228,7 @@
 
 
         // Menetapkan jalur koleksi publik (semua pengguna)
-        // Jalur: /artifacts/absensi-dinkes-stand/public/data/absensi_shifts
+        // Jalur: /artifacts/{appId}/public/data/absensi_shifts
         const PUBLIC_COLLECTION_PATH = `artifacts/${currentAppId}/public/data/absensi_shifts`;
 
         // Kata sandi admin sederhana (HANYA UNTUK DEMO)
@@ -250,24 +265,27 @@
         // Fungsi inisialisasi Firebase
         const initFirebase = async () => {
             try {
-                // Setel level log untuk debugging
-                setLogLevel('error');
+                // 0. Pengecekan Kritis sebelum inisialisasi Auth
+                if (!firebaseConfig.apiKey || !firebaseConfig.authDomain) {
+                    throw new Error("Konfigurasi Firebase tidak lengkap: apiKey atau authDomain hilang.");
+                }
+                
+                // Logging konfigurasi yang digunakan
+                console.log("Firebase Config (dibersihkan):", { 
+                    projectId: firebaseConfig.projectId, 
+                    authDomain: firebaseConfig.authDomain, 
+                    appId: currentAppId 
+                });
 
-                // 1. Inisialisasi Aplikasi dan Layanan
+                // Setel level log untuk debugging
+                setLogLevel('error'); // Disesuaikan untuk menghindari terlalu banyak log
+
+                // 1. Inisialisasi Aplikasi
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
-                auth = getAuth(app);
-
-                // 2. Otentikasi Pengguna
-                if (initialAuthToken) {
-                    // Gunakan token khusus jika tersedia
-                    await signInWithCustomToken(auth, initialAuthToken);
-                    console.log("Otentikasi berhasil menggunakan Custom Token.");
-                } else {
-                    // Fallback ke Otentikasi Anonim jika tidak ada token
-                    await signInAnonymously(auth);
-                    console.log("Otentikasi berhasil menggunakan Anonim.");
-                }
+                
+                // 2. Inisialisasi Otentikasi
+                auth = getAuth(app); // Masalah auth/configuration-not-found sering terjadi di sini.
 
                 // 3. Dengarkan perubahan status otentikasi
                 onAuthStateChanged(auth, async (user) => {
@@ -286,14 +304,41 @@
                         // Jika ada masalah otentikasi atau logout
                         userId = null;
                         currentUserIdEl.textContent = 'N/A';
-                        authStatusEl.textContent = 'ERROR: Gagal otentikasi. Aplikasi mungkin tidak dapat menyimpan data.';
+                        authStatusEl.textContent = 'Status: Auth Gagal. Mencoba masuk ulang...';
                         isAuthReady = false;
+                        
+                        // Coba masuk kembali jika statusnya tidak terautentikasi (mungkin gagal di awal)
+                        try {
+                            if (initialAuthToken) {
+                                await signInWithCustomToken(auth, initialAuthToken);
+                                console.log("Otentikasi ulang berhasil menggunakan Custom Token.");
+                            } else {
+                                await signInAnonymously(auth);
+                                console.log("Otentikasi ulang berhasil menggunakan Anonim.");
+                            }
+                        } catch(reauthError) {
+                             console.error("Gagal otentikasi ulang:", reauthError);
+                             authStatusEl.textContent = `ERROR: Gagal otentikasi. (${reauthError.code}). Cek konfigurasi.`;
+                        }
                     }
                 });
+                
+                // 4. Pemicu Otentikasi Awal (Jika onAuthStateChanged tidak otomatis memicu)
+                // Ini memastikan proses sign-in dimulai.
+                if (auth && !auth.currentUser) {
+                     if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        console.log("Otentikasi awal berhasil menggunakan Custom Token.");
+                     } else {
+                         await signInAnonymously(auth);
+                         console.log("Otentikasi awal berhasil menggunakan Anonim.");
+                     }
+                }
+
 
             } catch (error) {
                 console.error("Kesalahan inisialisasi Firebase:", error);
-                authStatusEl.textContent = `ERROR: Gagal inisialisasi (${error.code || error.message}). Pastikan konfigurasi Firebase valid.`;
+                authStatusEl.textContent = `ERROR: Gagal inisialisasi (${error.message}). Pastikan konfigurasi Firebase valid.`;
                 // Jika inisialisasi gagal total, pastikan tombol nonaktif
                 btnMasuk.disabled = true;
                 btnKeluar.disabled = true;
