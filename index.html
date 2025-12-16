@@ -24,7 +24,7 @@
         }
         /* Style for print mode */
         @media print {
-            .no-print, #adminLoginBtn {
+            .no-print, #adminAuthBtn {
                 display: none;
             }
             #app {
@@ -186,25 +186,41 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, setLogLevel, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ====================================================================
-        // KONFIGURASI FIREBASE & ADMIN
+        // KONFIGURASI FIREBASE & ADMIN (Telah Diperbarui)
         // ====================================================================
 
-        // Konfigurasi global dari lingkungan Canvas
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // Ambil konfigurasi dari variabel global lingkungan Canvas
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            // KONFIGURASI FALLBACK (berdasarkan data user)
+            apiKey: "AIzaSyDPp4IeriXx2m-NpfxAJrxDd-pE2YqBef4",
+            authDomain: "absensi-dinkes-stand.firebaseapp.com",
+            projectId: "absensi-dinkes-stand",
+            storageBucket: "absensi-dinkes-stand.firebasestorage.app",
+            messagingSenderId: "458172993222",
+            appId: "1:458172993222:web:e3d29d93b5284e04df11c7",
+            measurementId: "G-FE5XXDBDPM"
+        };
         
+        // Ambil app ID dari variabel global atau fallback ke projectId
+        const currentAppId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
+
+        // Ambil token autentikasi khusus dari variabel global
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+
         // Menetapkan jalur koleksi publik (semua pengguna)
-        const PUBLIC_COLLECTION_PATH = `artifacts/${appId}/public/data/absensi_shifts`;
+        // Jalur: /artifacts/absensi-dinkes-stand/public/data/absensi_shifts
+        const PUBLIC_COLLECTION_PATH = `artifacts/${currentAppId}/public/data/absensi_shifts`;
 
         // Kata sandi admin sederhana (HANYA UNTUK DEMO)
         const ADMIN_PASSWORD = 'dinkes123'; 
 
         let db;
+        let app;
         let auth;
         let userId = null;
         let isAuthReady = false;
@@ -224,7 +240,7 @@
         const shiftSelect = document.getElementById('shift');
         
         // Elemen Admin
-        const adminAuthBtn = document.getElementById('adminAuthBtn'); // Nama elemen diubah
+        const adminAuthBtn = document.getElementById('adminAuthBtn'); 
         const loginModal = document.getElementById('loginModal');
         const loginForm = document.getElementById('loginForm');
         const closeModalBtn = document.getElementById('closeModalBtn');
@@ -233,45 +249,55 @@
 
         // Fungsi inisialisasi Firebase
         const initFirebase = async () => {
-            if (!firebaseConfig) {
-                console.error("Kesalahan: Konfigurasi Firebase tidak ditemukan.");
-                authStatusEl.textContent = 'ERROR: Konfigurasi Firebase tidak ditemukan.';
-                return;
-            }
-
             try {
                 // Setel level log untuk debugging
                 setLogLevel('error');
 
-                const app = initializeApp(firebaseConfig);
+                // 1. Inisialisasi Aplikasi dan Layanan
+                app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // Dengarkan perubahan status otentikasi
+                // 2. Otentikasi Pengguna
+                if (initialAuthToken) {
+                    // Gunakan token khusus jika tersedia
+                    await signInWithCustomToken(auth, initialAuthToken);
+                    console.log("Otentikasi berhasil menggunakan Custom Token.");
+                } else {
+                    // Fallback ke Otentikasi Anonim jika tidak ada token
+                    await signInAnonymously(auth);
+                    console.log("Otentikasi berhasil menggunakan Anonim.");
+                }
+
+                // 3. Dengarkan perubahan status otentikasi
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         userId = user.uid;
                         currentUserIdEl.textContent = userId;
-                        authStatusEl.textContent = `Status: Terhubung (ID: ${userId})`;
+                        authStatusEl.textContent = `Status: Terhubung ke Firebase (ID: ${userId})`;
                         isAuthReady = true;
                         btnCetak.disabled = false; 
                         console.log("Pengguna terautentikasi. Memuat data publik...");
 
                         // Muat data absensi publik setelah autentikasi berhasil
                         setupRealtimeListener(); 
+                        checkFormStatus();
                     } else {
-                        // Jika belum ada pengguna, coba masuk.
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
+                        // Jika ada masalah otentikasi atau logout
+                        userId = null;
+                        currentUserIdEl.textContent = 'N/A';
+                        authStatusEl.textContent = 'ERROR: Gagal otentikasi. Aplikasi mungkin tidak dapat menyimpan data.';
+                        isAuthReady = false;
                     }
                 });
 
             } catch (error) {
                 console.error("Kesalahan inisialisasi Firebase:", error);
-                authStatusEl.textContent = `ERROR: Gagal inisialisasi (${error.code})`;
+                authStatusEl.textContent = `ERROR: Gagal inisialisasi (${error.code || error.message}). Pastikan konfigurasi Firebase valid.`;
+                // Jika inisialisasi gagal total, pastikan tombol nonaktif
+                btnMasuk.disabled = true;
+                btnKeluar.disabled = true;
+                btnCetak.disabled = true;
             }
         };
 
@@ -355,7 +381,10 @@
                     // Urutkan standar dari yang terbaru (descending)
                     if (!a.masuk) return 1; 
                     if (!b.masuk) return -1; 
-                    return b.masuk.toDate() - a.masuk.toDate();
+                    // Pastikan toDate() tersedia
+                    const dateA = typeof a.masuk.toDate === 'function' ? a.masuk.toDate() : new Date(0);
+                    const dateB = typeof b.masuk.toDate === 'function' ? b.masuk.toDate() : new Date(0);
+                    return dateB - dateA;
                 })
                 .forEach(item => {
                 const masukFormatted = formatTimestamp(item.masuk);
@@ -401,13 +430,13 @@
             }
 
             lucide.createIcons();
-            checkFormStatus(); 
+            // checkFormStatus(); // Panggil di sini hanya jika diperlukan, tapi sudah dipanggil di onAuthStateChanged
         };
 
         // Setup listener Realtime Firestore (Mendengarkan Koleksi Publik)
         const setupRealtimeListener = () => {
             if (!db) {
-                document.getElementById('data-status').textContent = 'Error: Database belum siap.';
+                document.getElementById('data-status').textContent = 'Error: Database belum siap. Cek koneksi Firebase.';
                 return;
             }
 
@@ -424,14 +453,18 @@
                 document.getElementById('data-status').textContent = `Total ${absensiData.length} catatan absensi ditemukan. `;
             }, (error) => {
                 console.error("Gagal mendengarkan data absensi:", error);
-                document.getElementById('data-status').textContent = `ERROR: Gagal memuat data. (${error.message})`;
+                document.getElementById('data-status').textContent = `ERROR: Gagal memuat data. (${error.message}). Pastikan Aturan Keamanan Firebase (rules) Anda sudah dikonfigurasi untuk mengizinkan Anonymous Read/Write.`;
+                // Jika error, nonaktifkan tombol untuk mencegah input data yang tidak tersimpan
+                btnMasuk.disabled = true;
+                btnKeluar.disabled = true;
+                btnCetak.disabled = true;
             });
         };
 
         // Fungsi Clock-In (Masuk)
         const handleClockIn = async () => {
-            if (!isAuthReady || !userId) {
-                showMessage('Harap tunggu autentikasi selesai.', 'red');
+            if (!isAuthReady || !userId || !db) {
+                showMessage('Harap tunggu autentikasi atau inisialisasi Firebase selesai.', 'red');
                 return;
             }
 
@@ -475,14 +508,14 @@
                 checkFormStatus(); 
             } catch (error) {
                 console.error("Gagal Clock-In:", error);
-                showMessage(`Gagal Clock-In. ${error.message}`, 'red');
+                showMessage(`Gagal Clock-In. ${error.message}. Pastikan koneksi dan aturan keamanan (rules) Firebase sudah benar.`, 'red');
             }
         };
 
         // Fungsi Clock-Out (Keluar)
         const handleClockOut = async () => {
-            if (!isAuthReady || !userId) {
-                showMessage('Harap tunggu autentikasi selesai.', 'red');
+            if (!isAuthReady || !userId || !db) {
+                showMessage('Harap tunggu autentikasi atau inisialisasi Firebase selesai.', 'red');
                 return;
             }
 
@@ -529,7 +562,7 @@
 
             } catch (error) {
                 console.error("Gagal Clock-Out:", error);
-                showMessage(`Gagal Clock-Out. ${error.message}`, 'red');
+                showMessage(`Gagal Clock-Out. ${error.message}. Pastikan koneksi dan aturan keamanan (rules) Firebase sudah benar.`, 'red');
             }
         };
 
@@ -539,16 +572,20 @@
                 showMessage('Akses ditolak. Hanya admin yang dapat menghapus data.', 'red');
                 return;
             }
+            if (!db) {
+                 showMessage('Database belum siap.', 'red');
+                 return;
+            }
 
             // Pengganti window.confirm() dengan konfirmasi sederhana
-            // NOTE: Kami menggunakan window.confirm karena tidak dapat membuat modal kustom yang kompleks tanpa membuat UI menjadi rumit
-            if (window.confirm(`Yakin ingin menghapus catatan absensi ${nama}? Tindakan ini tidak dapat dibatalkan.`)) {
+            // Menggunakan konfirmasi window.confirm() karena ini adalah file HTML tunggal untuk simplifikasi
+            if (confirm(`Yakin ingin menghapus catatan absensi ${nama}? Tindakan ini tidak dapat dibatalkan.`)) {
                 try {
                     await deleteDoc(doc(db, PUBLIC_COLLECTION_PATH, docId));
                     showMessage(`Catatan absensi ${nama} berhasil dihapus.`, 'green');
                 } catch (error) {
                     console.error("Gagal menghapus dokumen:", error);
-                    showMessage(`Gagal menghapus. ${error.message}`, 'red');
+                    showMessage(`Gagal menghapus. ${error.message}. Pastikan aturan keamanan (rules) Firebase sudah benar.`, 'red');
                 }
             }
         };
@@ -576,7 +613,6 @@
                 printTable.querySelectorAll('.btn-delete').forEach(btn => btn.closest('td').remove());
 
                 // Setelah menghapus kolom 'Aksi', kita perlu memastikan baris data memiliki jumlah sel yang benar.
-                // Jika tadinya 6 kolom (5 data + 1 aksi), sekarang harus menjadi 5.
                 printTable.querySelectorAll('tbody tr').forEach(row => {
                     const cells = row.querySelectorAll('td');
                     if (cells.length === 6) {
@@ -672,7 +708,7 @@
             const shift = shiftSelect.value;
             
             // Nonaktifkan semua tombol jika belum terautentikasi atau form belum lengkap
-            if (!nama || !shift || !isAuthReady) {
+            if (!nama || !shift || !isAuthReady || !db) {
                 btnMasuk.disabled = true;
                 btnKeluar.disabled = true;
                 return;
