@@ -190,45 +190,36 @@
         import { getFirestore, doc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, setLogLevel, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ====================================================================
-        // KONFIGURASI FIREBASE & ADMIN (Telah Direvisi untuk Mengatasi Galat)
+        // KONFIGURASI FIREBASE (Loading Asinkronus)
         // ====================================================================
 
         let firebaseConfig = {};
-        const DUMMY_API_KEY = "AIzaSyDPp4IeriXx2m-NpfxAJrxDd-pE2YqBef4"; // Digunakan jika gagal parsing config
+        const DUMMY_API_KEY = "AIzaSyDPp4IeriXx2m-NpfxAJrxDd-pE2YqBef4"; 
+        const DUMMY_AUTH_DOMAIN = "example-app.firebaseapp.com"; // Placeholder generik
+        const DUMMY_PROJECT_ID = "default-project-id";
 
+        // Coba memuat konfigurasi dari variabel global
         try {
-            // Coba parsing konfigurasi dari variabel global
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
                 firebaseConfig = JSON.parse(__firebase_config);
+                console.log("SUCCESS: __firebase_config berhasil diparse.");
             } else {
-                 console.warn("Variabel __firebase_config tidak ditemukan. Menggunakan konfigurasi fallback.");
-                 // Fallback configuration based on typical app structure
-                 firebaseConfig = {
-                    apiKey: DUMMY_API_KEY, 
-                    authDomain: "absensi-dinkes-stand.firebaseapp.com",
-                    projectId: "absensi-dinkes-stand",
-                    // ... tambahkan properti lain sesuai kebutuhan
-                 };
+                 console.warn("WARNING: Variabel __firebase_config tidak ditemukan.");
             }
         } catch (e) {
-            console.error("Gagal parsing __firebase_config:", e);
-             // Fallback jika parsing JSON gagal
-            firebaseConfig = {
-                apiKey: DUMMY_API_KEY, 
-                authDomain: "absensi-dinkes-stand.firebaseapp.com",
-                projectId: "absensi-dinkes-stand",
-            };
+            console.error("ERROR: Gagal parsing __firebase_config:", e);
         }
 
-        // Ambil app ID dari variabel global atau fallback ke projectId
-        const currentAppId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
+        // Memastikan konfigurasi minimal ada, menggunakan fallback jika hilang
+        firebaseConfig.apiKey = firebaseConfig.apiKey || DUMMY_API_KEY;
+        firebaseConfig.authDomain = firebaseConfig.authDomain || DUMMY_AUTH_DOMAIN;
+        firebaseConfig.projectId = firebaseConfig.projectId || DUMMY_PROJECT_ID;
 
-        // Ambil token autentikasi khusus dari variabel global
+        // Ambil app ID dan token dari variabel global
+        const currentAppId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-
-        // Menetapkan jalur koleksi publik (semua pengguna)
-        // Jalur: /artifacts/{appId}/public/data/absensi_shifts
+        // Menetapkan jalur koleksi publik
         const PUBLIC_COLLECTION_PATH = `artifacts/${currentAppId}/public/data/absensi_shifts`;
 
         // Kata sandi admin sederhana (HANYA UNTUK DEMO)
@@ -265,27 +256,22 @@
         // Fungsi inisialisasi Firebase
         const initFirebase = async () => {
             try {
-                // 0. Pengecekan Kritis sebelum inisialisasi Auth
-                if (!firebaseConfig.apiKey || !firebaseConfig.authDomain) {
-                    throw new Error("Konfigurasi Firebase tidak lengkap: apiKey atau authDomain hilang.");
-                }
-                
-                // Logging konfigurasi yang digunakan
-                console.log("Firebase Config (dibersihkan):", { 
-                    projectId: firebaseConfig.projectId, 
-                    authDomain: firebaseConfig.authDomain, 
-                    appId: currentAppId 
-                });
-
-                // Setel level log untuk debugging
-                setLogLevel('error'); // Disesuaikan untuk menghindari terlalu banyak log
+                // LOGGING DETAIL KONFIGURASI SEBELUM INIT
+                console.log("--- Firebase Initialization Details ---");
+                console.log("Config (API Key):", firebaseConfig.apiKey ? "Ditemukan/Fallback" : "HILANG");
+                console.log("Config (Auth Domain):", firebaseConfig.authDomain);
+                console.log("App ID:", currentAppId);
+                console.log("Initial Auth Token Status:", initialAuthToken ? "Ditemukan" : "HILANG");
+                console.log("---------------------------------------");
 
                 // 1. Inisialisasi Aplikasi
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 
                 // 2. Inisialisasi Otentikasi
-                auth = getAuth(app); // Masalah auth/configuration-not-found sering terjadi di sini.
+                // getAuth() memerlukan authDomain yang valid.
+                auth = getAuth(app); 
+                console.log("SUCCESS: getAuth() dipanggil berhasil.");
 
                 // 3. Dengarkan perubahan status otentikasi
                 onAuthStateChanged(auth, async (user) => {
@@ -296,50 +282,33 @@
                         isAuthReady = true;
                         btnCetak.disabled = false; 
                         console.log("Pengguna terautentikasi. Memuat data publik...");
-
-                        // Muat data absensi publik setelah autentikasi berhasil
                         setupRealtimeListener(); 
                         checkFormStatus();
                     } else {
-                        // Jika ada masalah otentikasi atau logout
                         userId = null;
                         currentUserIdEl.textContent = 'N/A';
                         authStatusEl.textContent = 'Status: Auth Gagal. Mencoba masuk ulang...';
                         isAuthReady = false;
                         
-                        // Coba masuk kembali jika statusnya tidak terautentikasi (mungkin gagal di awal)
+                        // 4. Pemicu Otentikasi Awal/Ulang jika belum ada user
                         try {
                             if (initialAuthToken) {
                                 await signInWithCustomToken(auth, initialAuthToken);
-                                console.log("Otentikasi ulang berhasil menggunakan Custom Token.");
+                                console.log("Otentikasi awal/ulang berhasil menggunakan Custom Token.");
                             } else {
                                 await signInAnonymously(auth);
-                                console.log("Otentikasi ulang berhasil menggunakan Anonim.");
+                                console.log("Otentikasi awal/ulang berhasil menggunakan Anonim.");
                             }
                         } catch(reauthError) {
-                             console.error("Gagal otentikasi ulang:", reauthError);
-                             authStatusEl.textContent = `ERROR: Gagal otentikasi. (${reauthError.code}). Cek konfigurasi.`;
+                             console.error("ERROR: Gagal otentikasi awal/ulang:", reauthError);
+                             authStatusEl.textContent = `ERROR: Gagal otentikasi. (${reauthError.code}). Cek konfigurasi/koneksi.`;
                         }
                     }
                 });
                 
-                // 4. Pemicu Otentikasi Awal (Jika onAuthStateChanged tidak otomatis memicu)
-                // Ini memastikan proses sign-in dimulai.
-                if (auth && !auth.currentUser) {
-                     if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                        console.log("Otentikasi awal berhasil menggunakan Custom Token.");
-                     } else {
-                         await signInAnonymously(auth);
-                         console.log("Otentikasi awal berhasil menggunakan Anonim.");
-                     }
-                }
-
-
             } catch (error) {
-                console.error("Kesalahan inisialisasi Firebase:", error);
-                authStatusEl.textContent = `ERROR: Gagal inisialisasi (${error.message}). Pastikan konfigurasi Firebase valid.`;
-                // Jika inisialisasi gagal total, pastikan tombol nonaktif
+                console.error("FATAL ERROR: Kesalahan inisialisasi Firebase:", error);
+                authStatusEl.textContent = `FATAL ERROR: Gagal inisialisasi (${error.message}). Cek Konsol untuk detail Konfigurasi.`;
                 btnMasuk.disabled = true;
                 btnKeluar.disabled = true;
                 btnCetak.disabled = true;
@@ -347,23 +316,19 @@
         };
 
         // ====================================================================
-        // FUNGSI UMUM & UI
+        // FUNGSI UMUM & UI (Tidak Berubah dari versi sebelumnya, tapi disertakan untuk kelengkapan)
         // ====================================================================
 
-        // Konverter timestamp ke format tanggal/jam yang mudah dibaca
         const formatTimestamp = (timestamp) => {
             if (!timestamp) return 'N/A';
             if (typeof timestamp.toDate !== 'function') return 'Pending...';
             
             const date = timestamp.toDate();
-            // Format Tanggal: DD/MM/YYYY
             const datePart = date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            // Format Jam: HH:MM:SS
             const timePart = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             return { date: datePart, time: timePart };
         };
 
-        // Fungsi untuk menampilkan pesan status
         const showMessage = (text, color) => {
             messageEl.textContent = text;
             messageEl.className = messageEl.className.replace(/\btext-(green|red|orange|gray|blue)-\d{3}\b/g, '');
@@ -374,35 +339,23 @@
             }, 5000);
         };
 
-        /**
-         * Mengatur tampilan tombol Admin berdasarkan status isAdmin.
-         * Dipanggil setelah Login/Logout.
-         */
         const updateAdminButtonUI = () => {
             if (isAdmin) {
-                // Status Admin Aktif (Tombol menjadi Logout)
                 adminAuthBtn.innerHTML = '<i data-lucide="shield-off" class="w-4 h-4 mr-1"></i> Logout Admin';
                 adminAuthBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-                adminAuthBtn.classList.add('bg-orange-600', 'hover:bg-orange-700'); // Warna oranye untuk Logout
-                adminAuthBtn.disabled = false; // Tombol Logout harus bisa diklik
-                lucide.createIcons();
+                adminAuthBtn.classList.add('bg-orange-600', 'hover:bg-orange-700'); 
             } else {
-                // Status Admin Tidak Aktif (Tombol menjadi Login)
                 adminAuthBtn.innerHTML = '<i data-lucide="shield" class="w-4 h-4 mr-1"></i> Login Admin';
                 adminAuthBtn.classList.remove('bg-orange-600', 'hover:bg-orange-700');
                 adminAuthBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-                adminAuthBtn.disabled = false; // Tombol Login harus bisa diklik
-                lucide.createIcons();
             }
+            lucide.createIcons();
         };
 
-
-        // Menampilkan data absensi di tabel
         const renderAbsensi = (absensiData) => {
             const filter = filterShiftEl.value;
-            absensiListEl.innerHTML = ''; // Kosongkan tabel
+            absensiListEl.innerHTML = ''; 
             
-            // Tampilkan/Sembunyikan kolom Aksi
             if (isAdmin) {
                 aksiHeader.classList.remove('hidden');
             } else {
@@ -414,7 +367,7 @@
                 return item.shift === filter;
             });
 
-            const dataColumnCount = isAdmin ? 6 : 5; // 5 data columns + 1 Aksi column if admin
+            const dataColumnCount = isAdmin ? 6 : 5; 
 
             if (filteredData.length === 0) {
                 absensiListEl.innerHTML = `<tr><td colspan="${dataColumnCount}" class="p-4 text-center text-gray-500">Tidak ada data absensi untuk shift yang dipilih.</td></tr>`;
@@ -423,10 +376,8 @@
 
             filteredData
                 .sort((a, b) => {
-                    // Urutkan standar dari yang terbaru (descending)
                     if (!a.masuk) return 1; 
                     if (!b.masuk) return -1; 
-                    // Pastikan toDate() tersedia
                     const dateA = typeof a.masuk.toDate === 'function' ? a.masuk.toDate() : new Date(0);
                     const dateB = typeof b.masuk.toDate === 'function' ? b.masuk.toDate() : new Date(0);
                     return dateB - dateA;
@@ -435,7 +386,6 @@
                 const masukFormatted = formatTimestamp(item.masuk);
                 const keluarFormatted = formatTimestamp(item.keluar);
                 const isClockedIn = !item.keluar; 
-
                 const locationText = `<span class="text-xs text-gray-400">(N/A)</span>`;
 
                 const row = document.createElement('tr');
@@ -463,7 +413,6 @@
                 absensiListEl.appendChild(row);
             });
 
-            // Tambahkan event listener untuk tombol hapus (jika admin)
             if (isAdmin) {
                 absensiListEl.querySelectorAll('.btn-delete').forEach(button => {
                     button.addEventListener('click', (e) => {
@@ -475,13 +424,11 @@
             }
 
             lucide.createIcons();
-            // checkFormStatus(); // Panggil di sini hanya jika diperlukan, tapi sudah dipanggil di onAuthStateChanged
         };
 
-        // Setup listener Realtime Firestore (Mendengarkan Koleksi Publik)
         const setupRealtimeListener = () => {
-            if (!db) {
-                document.getElementById('data-status').textContent = 'Error: Database belum siap. Cek koneksi Firebase.';
+            if (!db || !isAuthReady) {
+                document.getElementById('data-status').textContent = 'Error: Database belum siap atau Auth belum selesai.';
                 return;
             }
 
@@ -498,15 +445,13 @@
                 document.getElementById('data-status').textContent = `Total ${absensiData.length} catatan absensi ditemukan. `;
             }, (error) => {
                 console.error("Gagal mendengarkan data absensi:", error);
-                document.getElementById('data-status').textContent = `ERROR: Gagal memuat data. (${error.message}). Pastikan Aturan Keamanan Firebase (rules) Anda sudah dikonfigurasi untuk mengizinkan Anonymous Read/Write.`;
-                // Jika error, nonaktifkan tombol untuk mencegah input data yang tidak tersimpan
+                document.getElementById('data-status').textContent = `ERROR: Gagal memuat data. (${error.message}). Pastikan Aturan Keamanan Firebase sudah benar.`;
                 btnMasuk.disabled = true;
                 btnKeluar.disabled = true;
                 btnCetak.disabled = true;
             });
         };
 
-        // Fungsi Clock-In (Masuk)
         const handleClockIn = async () => {
             if (!isAuthReady || !userId || !db) {
                 showMessage('Harap tunggu autentikasi atau inisialisasi Firebase selesai.', 'red');
@@ -524,7 +469,6 @@
             showMessage('Melanjutkan Clock-In...', 'blue');
 
             try {
-                // Cek Status Terbuka
                 const qCheck = query(
                     collection(db, PUBLIC_COLLECTION_PATH),
                     where('nama', '==', nama),
@@ -539,7 +483,6 @@
                     return;
                 }
 
-                // Tambahkan dokumen baru ke koleksi publik
                 await addDoc(collection(db, PUBLIC_COLLECTION_PATH), {
                     nama: nama,
                     shift: shift,
@@ -557,7 +500,6 @@
             }
         };
 
-        // Fungsi Clock-Out (Keluar)
         const handleClockOut = async () => {
             if (!isAuthReady || !userId || !db) {
                 showMessage('Harap tunggu autentikasi atau inisialisasi Firebase selesai.', 'red');
@@ -573,7 +515,6 @@
             }
             
             try {
-                // Cari catatan absensi terakhir yang belum Clock-Out untuk karyawan ini
                 const qFindOpen = query(
                     collection(db, PUBLIC_COLLECTION_PATH),
                     where('nama', '==', nama),
@@ -590,17 +531,14 @@
                     return;
                 }
 
-                // Ambil dokumen pertama yang ditemukan (yang terbaru)
                 const docToUpdate = snapshot.docs[0];
 
-                // Update dokumen di koleksi publik
                 await updateDoc(doc(db, PUBLIC_COLLECTION_PATH, docToUpdate.id), {
                     keluar: serverTimestamp()
                 });
 
                 showMessage(`Clock-Out Shift ${shift} untuk ${nama} berhasil!`, 'green');
                 
-                // Clear form dan perbarui status tombol
                 namaInput.value = '';
                 shiftSelect.value = '';
                 checkFormStatus(); 
@@ -611,7 +549,6 @@
             }
         };
 
-        // Fungsi HAPUS Data (Hanya untuk Admin)
         const handleDelete = async (docId, nama) => {
             if (!isAdmin) {
                 showMessage('Akses ditolak. Hanya admin yang dapat menghapus data.', 'red');
@@ -622,8 +559,6 @@
                  return;
             }
 
-            // Pengganti window.confirm() dengan konfirmasi sederhana
-            // Menggunakan konfirmasi window.confirm() karena ini adalah file HTML tunggal untuk simplifikasi
             if (confirm(`Yakin ingin menghapus catatan absensi ${nama}? Tindakan ini tidak dapat dibatalkan.`)) {
                 try {
                     await deleteDoc(doc(db, PUBLIC_COLLECTION_PATH, docId));
@@ -636,7 +571,6 @@
         };
 
 
-        // Fungsi CETAK Data (berdasarkan data yang terlihat di tabel)
         const handlePrintData = () => {
             const tableContainer = document.getElementById('absensiTableContainer');
             
@@ -647,33 +581,28 @@
 
             const printContent = tableContainer.cloneNode(true);
             
-            // Hapus kolom Aksi jika ada sebelum mencetak
             const printTable = printContent.querySelector('#absensiTable');
             const thAksi = printTable.querySelector('#aksiHeader');
             if (thAksi && !thAksi.classList.contains('hidden')) {
                 thAksi.remove();
                 printTable.querySelectorAll('.no-print').forEach(el => el.remove());
                 
-                // Hapus tombol hapus dari baris data
                 printTable.querySelectorAll('.btn-delete').forEach(btn => btn.closest('td').remove());
 
-                // Setelah menghapus kolom 'Aksi', kita perlu memastikan baris data memiliki jumlah sel yang benar.
                 printTable.querySelectorAll('tbody tr').forEach(row => {
                     const cells = row.querySelectorAll('td');
                     if (cells.length === 6) {
-                        cells[5].remove(); // Hapus sel terakhir (yang tadinya Aksi)
+                        cells[5].remove(); 
                     }
                 });
             }
 
 
-            // Adjust styles for printing
             printContent.style.overflowX = 'visible';
             printContent.style.maxHeight = 'none';
             printContent.style.boxShadow = 'none';
             printContent.style.border = 'none';
 
-            // Create print header
             const printDate = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
             const shiftFilter = filterShiftEl.value;
 
@@ -713,7 +642,6 @@
                             -webkit-print-color-adjust: exact;
                             color-adjust: exact;
                         }
-                        /* Tailwind classes for row styling */
                         .text-gray-400 { color: #9ca3af; }
                         .text-green-600 { color: #059669; }
                         .text-red-600 { color: #dc2626; }
@@ -747,12 +675,10 @@
         };
 
 
-        // Mengecek status form untuk mengaktifkan/menonaktifkan tombol
         const checkFormStatus = async () => {
             const nama = namaInput.value.trim();
             const shift = shiftSelect.value;
             
-            // Nonaktifkan semua tombol jika belum terautentikasi atau form belum lengkap
             if (!nama || !shift || !isAuthReady || !db) {
                 btnMasuk.disabled = true;
                 btnKeluar.disabled = true;
@@ -760,22 +686,19 @@
             }
 
             try {
-                // Cek status Clock-In terakhir di koleksi publik
                 const qCheck = query(
                     collection(db, PUBLIC_COLLECTION_PATH),
                     where('nama', '==', nama),
                     where('shift', '==', shift),
-                    where('keluar', '==', null) // Cari yang belum keluar
+                    where('keluar', '==', null)
                 );
 
                 const snapshot = await getDocs(qCheck);
 
                 if (snapshot.size > 0) {
-                    // Sudah Clock-In dan belum Clock-Out
                     btnMasuk.disabled = true;
                     btnKeluar.disabled = false;
                 } else {
-                    // Belum Clock-In
                     btnMasuk.disabled = false;
                     btnKeluar.disabled = true;
                 }
@@ -786,17 +709,13 @@
             }
         };
 
-        // Fungsi Logout Admin
         const handleAdminLogout = () => {
             isAdmin = false;
             showMessage('Logout Admin berhasil. Kolom Aksi disembunyikan.', 'gray');
             updateAdminButtonUI();
-            
-            // Paksa render ulang tabel untuk menyembunyikan kolom Aksi
             if (db) setupRealtimeListener(); 
         }
 
-        // Fungsi Login Admin
         const handleAdminLogin = (e) => {
             e.preventDefault();
             const passwordInput = document.getElementById('adminPassword');
@@ -805,26 +724,23 @@
             if (password === ADMIN_PASSWORD) {
                 isAdmin = true;
                 loginModal.classList.add('hidden');
-                passwordInput.value = ''; // Kosongkan password
+                passwordInput.value = ''; 
                 
                 showMessage('Login Admin berhasil! Kolom Aksi sekarang terlihat.', 'green');
                 updateAdminButtonUI();
 
-                // Paksa render ulang tabel untuk menampilkan kolom Aksi
                 if (db) setupRealtimeListener(); 
             } else {
                 showMessage('Password Admin salah.', 'red');
-                passwordInput.value = ''; // Kosongkan password
+                passwordInput.value = ''; 
             }
         };
 
         // Listener Global untuk Tombol Admin (Login/Logout)
         adminAuthBtn.addEventListener('click', () => {
             if (isAdmin) {
-                // Jika sudah login, lakukan logout
                 handleAdminLogout();
             } else {
-                // Jika belum login, tampilkan modal login
                 loginModal.classList.remove('hidden');
                 document.getElementById('adminPassword').focus();
             }
@@ -842,7 +758,6 @@
              }
         });
         
-        // Listener form input (untuk mengaktifkan/menonaktifkan tombol)
         absensiForm.addEventListener('input', checkFormStatus);
 
         // Listener Modal Login
@@ -857,7 +772,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
             initFirebase();
-            updateAdminButtonUI(); // Setel tampilan awal tombol admin
+            updateAdminButtonUI(); 
         });
     </script>
 </body>
