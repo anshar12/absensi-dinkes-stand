@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Absensi Jaga Stand Dinas Kesehatan</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f9;
+        }
+        /* Custom scrollbar for better look */
+        #absensiTableContainer::-webkit-scrollbar {
+            width: 8px;
+        }
+        #absensiTableContainer::-webkit-scrollbar-thumb {
+            background-color: #9ca3af;
+            border-radius: 4px;
+        }
+        /* Style for print mode */
+        @media print {
+            .no-print, #adminLoginBtn {
+                display: none;
+            }
+            #app {
+                box-shadow: none;
+                padding: 0;
+            }
+            .max-w-4xl {
+                max-width: 100%;
+            }
+            body {
+                background-color: white;
+            }
+            .sticky-header th {
+                background-color: #f2f2f2 !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="app" class="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-6 md:p-10">
+
+        <header class="mb-8 border-b pb-4 flex justify-between items-start">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800 flex items-center">
+                    <i data-lucide="calendar-check" class="w-7 h-7 mr-3 text-indigo-600"></i>
+                    Absensi Jaga Stand Dinkes 
+                </h1>
+                <p id="auth-status" class="text-xs mt-2 text-gray-500">
+                    Memuat status pengguna...
+                </p>
+            </div>
+            <!-- Tombol Login/Logout Admin -->
+            <button id="adminAuthBtn" class="bg-indigo-600 text-white text-xs font-semibold py-2 px-3 rounded-lg hover:bg-indigo-700 transition duration-200 shadow-md flex items-center">
+                <i data-lucide="shield" class="w-4 h-4 mr-1"></i>
+                Login Admin
+            </button>
+        </header>
+
+        <!-- Form Pencatatan Absensi & Aksi -->
+        <section class="mb-8 p-6 bg-indigo-50 border border-indigo-200 rounded-lg no-print">
+            <h2 class="text-xl font-semibold text-indigo-800 mb-2">Absen Dulu....... </h2>
+            <!-- Catatan/Peringatan Baru Sesuai Permintaan User -->
+            <p class="text-sm text-indigo-700 italic mb-4 flex items-center">
+                <i data-lucide="alert-triangle" class="w-4 h-4 mr-1 text-indigo-600"></i> 
+                Catatan: Mohon absen (Masuk/Keluar) sesuai dengan jam shift yang berlaku ya, Kak.
+            </p>
+            
+            <form id="absensiForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                <!-- Input Nama -->
+                <div class="col-span-1">
+                    <label for="nama" class="block text-sm font-medium text-gray-700">Nama Karyawan</label>
+                    <input type="text" id="nama" name="nama" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+                </div>
+
+                <!-- Pilihan Shift -->
+                <div class="col-span-1">
+                    <label for="shift" class="block text-sm font-medium text-gray-700">Pilih Shift</label>
+                    <select id="shift" name="shift" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+                        <option value="">-- Pilih Shift --</option>
+                        <option value="Sore">Sore (15:00 - 18:00)</option>
+                        <option value="Malam">Malam (19:00 - 22:00)</option>
+                        
+                    </select>
+                    
+                </div>
+            
+                <!-- Tombol Aksi (Masuk, Keluar, Cetak) -->
+                <div class="col-span-1 flex items-end space-x-2">
+                    <button type="button" id="btnMasuk" class="w-1/3 bg-green-600 text-white text-sm font-semibold py-3 px-1 rounded-lg hover:bg-green-700 transition duration-200 shadow-md flex items-center justify-center disabled:opacity-50" disabled>
+                        <i data-lucide="log-in" class="w-4 h-4 mr-1"></i>
+                        MASUK
+                    </button>
+                    <button type="button" id="btnKeluar" class="w-1/3 bg-red-600 text-white text-sm font-semibold py-3 px-1 rounded-lg hover:bg-red-700 transition duration-200 shadow-md flex items-center justify-center disabled:opacity-50" disabled>
+                        <i data-lucide="log-out" class="w-4 h-4 mr-1"></i>
+                        KELUAR
+                    </button>
+                    <button type="button" id="btnCetak" class="w-1/3 bg-gray-500 text-white text-sm font-semibold py-3 px-1 rounded-lg hover:bg-gray-600 transition duration-200 shadow-md flex items-center justify-center disabled:opacity-50" disabled>
+                        <i data-lucide="printer" class="w-4 h-4 mr-1"></i>
+                        CETAK
+                    </button>
+                </div>
+            </form>
+            <p id="message" class="mt-4 text-sm font-medium text-gray-700"></p>
+        </section>
+
+        <!-- Bagian Filter dan Tabel Riwayat Absensi -->
+        <section class="mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                <i data-lucide="database" class="w-6 h-6 mr-2 text-indigo-600"></i>
+                Riwayat Absensi 
+            </h2>
+
+            <!-- Filter Shift -->
+            <div class="mb-4 flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 no-print">
+                <span class="text-sm font-medium text-gray-700">Filter Tampilan Shift:</span>
+                <select id="filterShift" class="rounded-md border-gray-300 shadow-sm p-2 border focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+                    <option value="Semua">Semua Shift</option>
+                    <option value="Sore">Shift Sore</option>
+                    <option value="Malam">Shift Malam</option>
+                </select>
+                <!-- Menampilkan ID Otentikasi untuk akses data bersama -->
+                <div id="user-id-display" class="text-sm text-gray-600 bg-gray-100 p-2 rounded-md truncate">
+                    ID Otentikasi: <span id="current-user-id"></span>
+                </div>
+            </div>
+
+            <!-- Tabel Absensi -->
+            <div id="absensiTableContainer" class="overflow-x-auto max-h-96 relative shadow-lg rounded-lg border">
+                <table id="absensiTable" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0 sticky-header">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Masuk</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keluar</th>
+                            <!-- Kolom Aksi (Hanya muncul jika admin) -->
+                            <th id="aksiHeader" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden no-print">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="absensiList" class="bg-white divide-y divide-gray-200">
+                        <!-- Data akan diisi oleh JavaScript -->
+                        <tr>
+                            <td colspan="5" class="p-4 text-center text-gray-500">Memuat data absensi...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p id="data-status" class="mt-4 text-sm text-gray-500"></p>
+        </section>
+
+    </div>
+
+    <!-- MODAL LOGIN ADMIN -->
+    <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+            <h3 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
+                <i data-lucide="shield-lock" class="w-5 h-5 mr-2 text-indigo-600"></i>
+                Login Admin
+            </h3>
+            <form id="loginForm">
+                <div class="mb-4">
+                    <label for="adminPassword" class="block text-sm font-medium text-gray-700">Password Admin</label>
+                    <input type="password" id="adminPassword" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+                </div>
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="closeModalBtn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150">Batal</button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition duration-150">Masuk</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- END MODAL LOGIN ADMIN -->
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, setLogLevel, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ====================================================================
+        // KONFIGURASI FIREBASE & ADMIN
+        // ====================================================================
+
+        // Konfigurasi global dari lingkungan Canvas
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // Menetapkan jalur koleksi publik (semua pengguna)
+        const PUBLIC_COLLECTION_PATH = `artifacts/${appId}/public/data/absensi_shifts`;
+
+        // Kata sandi admin sederhana (HANYA UNTUK DEMO)
+        const ADMIN_PASSWORD = 'dinkes123'; 
+
+        let db;
+        let auth;
+        let userId = null;
+        let isAuthReady = false;
+        let isAdmin = false; // Status admin
+
+        // Elemen UI
+        const currentUserIdEl = document.getElementById('current-user-id');
+        const authStatusEl = document.getElementById('auth-status');
+        const absensiListEl = document.getElementById('absensiList');
+        const absensiForm = document.getElementById('absensiForm');
+        const btnMasuk = document.getElementById('btnMasuk');
+        const btnKeluar = document.getElementById('btnKeluar');
+        const btnCetak = document.getElementById('btnCetak');
+        const messageEl = document.getElementById('message');
+        const filterShiftEl = document.getElementById('filterShift');
+        const namaInput = document.getElementById('nama');
+        const shiftSelect = document.getElementById('shift');
+        
+        // Elemen Admin
+        const adminAuthBtn = document.getElementById('adminAuthBtn'); // Nama elemen diubah
+        const loginModal = document.getElementById('loginModal');
+        const loginForm = document.getElementById('loginForm');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const aksiHeader = document.getElementById('aksiHeader');
+
+
+        // Fungsi inisialisasi Firebase
+        const initFirebase = async () => {
+            if (!firebaseConfig) {
+                console.error("Kesalahan: Konfigurasi Firebase tidak ditemukan.");
+                authStatusEl.textContent = 'ERROR: Konfigurasi Firebase tidak ditemukan.';
+                return;
+            }
+
+            try {
+                // Setel level log untuk debugging
+                setLogLevel('error');
+
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Dengarkan perubahan status otentikasi
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        currentUserIdEl.textContent = userId;
+                        authStatusEl.textContent = `Status: Terhubung (ID: ${userId})`;
+                        isAuthReady = true;
+                        btnCetak.disabled = false; 
+                        console.log("Pengguna terautentikasi. Memuat data publik...");
+
+                        // Muat data absensi publik setelah autentikasi berhasil
+                        setupRealtimeListener(); 
+                    } else {
+                        // Jika belum ada pengguna, coba masuk.
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("Kesalahan inisialisasi Firebase:", error);
+                authStatusEl.textContent = `ERROR: Gagal inisialisasi (${error.code})`;
+            }
+        };
+
+        // ====================================================================
+        // FUNGSI UMUM & UI
+        // ====================================================================
+
+        // Konverter timestamp ke format tanggal/jam yang mudah dibaca
+        const formatTimestamp = (timestamp) => {
+            if (!timestamp) return 'N/A';
+            if (typeof timestamp.toDate !== 'function') return 'Pending...';
+            
+            const date = timestamp.toDate();
+            // Format Tanggal: DD/MM/YYYY
+            const datePart = date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            // Format Jam: HH:MM:SS
+            const timePart = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            return { date: datePart, time: timePart };
+        };
+
+        // Fungsi untuk menampilkan pesan status
+        const showMessage = (text, color) => {
+            messageEl.textContent = text;
+            messageEl.className = messageEl.className.replace(/\btext-(green|red|orange|gray|blue)-\d{3}\b/g, '');
+            messageEl.classList.add(`text-${color}-600`);
+            setTimeout(() => {
+                messageEl.textContent = '';
+                messageEl.classList.remove(`text-${color}-600`);
+            }, 5000);
+        };
+
+        /**
+         * Mengatur tampilan tombol Admin berdasarkan status isAdmin.
+         * Dipanggil setelah Login/Logout.
+         */
+        const updateAdminButtonUI = () => {
+            if (isAdmin) {
+                // Status Admin Aktif (Tombol menjadi Logout)
+                adminAuthBtn.innerHTML = '<i data-lucide="shield-off" class="w-4 h-4 mr-1"></i> Logout Admin';
+                adminAuthBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                adminAuthBtn.classList.add('bg-orange-600', 'hover:bg-orange-700'); // Warna oranye untuk Logout
+                adminAuthBtn.disabled = false; // Tombol Logout harus bisa diklik
+                lucide.createIcons();
+            } else {
+                // Status Admin Tidak Aktif (Tombol menjadi Login)
+                adminAuthBtn.innerHTML = '<i data-lucide="shield" class="w-4 h-4 mr-1"></i> Login Admin';
+                adminAuthBtn.classList.remove('bg-orange-600', 'hover:bg-orange-700');
+                adminAuthBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                adminAuthBtn.disabled = false; // Tombol Login harus bisa diklik
+                lucide.createIcons();
+            }
+        };
+
+
+        // Menampilkan data absensi di tabel
+        const renderAbsensi = (absensiData) => {
+            const filter = filterShiftEl.value;
+            absensiListEl.innerHTML = ''; // Kosongkan tabel
+            
+            // Tampilkan/Sembunyikan kolom Aksi
+            if (isAdmin) {
+                aksiHeader.classList.remove('hidden');
+            } else {
+                aksiHeader.classList.add('hidden');
+            }
+
+            const filteredData = absensiData.filter(item => {
+                if (filter === 'Semua') return true;
+                return item.shift === filter;
+            });
+
+            const dataColumnCount = isAdmin ? 6 : 5; // 5 data columns + 1 Aksi column if admin
+
+            if (filteredData.length === 0) {
+                absensiListEl.innerHTML = `<tr><td colspan="${dataColumnCount}" class="p-4 text-center text-gray-500">Tidak ada data absensi untuk shift yang dipilih.</td></tr>`;
+                return;
+            }
+
+            filteredData
+                .sort((a, b) => {
+                    // Urutkan standar dari yang terbaru (descending)
+                    if (!a.masuk) return 1; 
+                    if (!b.masuk) return -1; 
+                    return b.masuk.toDate() - a.masuk.toDate();
+                })
+                .forEach(item => {
+                const masukFormatted = formatTimestamp(item.masuk);
+                const keluarFormatted = formatTimestamp(item.keluar);
+                const isClockedIn = !item.keluar; 
+
+                const locationText = `<span class="text-xs text-gray-400">(N/A)</span>`;
+
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition duration-100';
+                row.innerHTML = `
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${item.nama}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.shift === 'Sore' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}">
+                            ${item.shift}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${masukFormatted.date}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600">${masukFormatted.time} ${locationText}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm ${isClockedIn ? 'text-gray-400 italic' : 'text-red-600 font-semibold'}">${isClockedIn ? 'Belum Keluar' : keluarFormatted.time}</td>
+                    ${isAdmin ? `
+                        <td class="px-4 py-3 whitespace-nowrap text-sm no-print">
+                            <button class="text-red-600 hover:text-red-800 transition duration-150 btn-delete" 
+                                    data-doc-id="${item.id}" 
+                                    data-nama="${item.nama}">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    ` : ''}
+                `;
+                absensiListEl.appendChild(row);
+            });
+
+            // Tambahkan event listener untuk tombol hapus (jika admin)
+            if (isAdmin) {
+                absensiListEl.querySelectorAll('.btn-delete').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const docId = e.currentTarget.dataset.docId;
+                        const nama = e.currentTarget.dataset.nama;
+                        handleDelete(docId, nama);
+                    });
+                });
+            }
+
+            lucide.createIcons();
+            checkFormStatus(); 
+        };
+
+        // Setup listener Realtime Firestore (Mendengarkan Koleksi Publik)
+        const setupRealtimeListener = () => {
+            if (!db) {
+                document.getElementById('data-status').textContent = 'Error: Database belum siap.';
+                return;
+            }
+
+            const q = query(collection(db, PUBLIC_COLLECTION_PATH));
+
+            document.getElementById('data-status').textContent = 'Mendengarkan perubahan data absensi bersama...';
+
+            onSnapshot(q, (snapshot) => {
+                const absensiData = [];
+                snapshot.forEach((doc) => {
+                    absensiData.push({ id: doc.id, ...doc.data() });
+                });
+                renderAbsensi(absensiData);
+                document.getElementById('data-status').textContent = `Total ${absensiData.length} catatan absensi ditemukan. `;
+            }, (error) => {
+                console.error("Gagal mendengarkan data absensi:", error);
+                document.getElementById('data-status').textContent = `ERROR: Gagal memuat data. (${error.message})`;
+            });
+        };
+
+        // Fungsi Clock-In (Masuk)
+        const handleClockIn = async () => {
+            if (!isAuthReady || !userId) {
+                showMessage('Harap tunggu autentikasi selesai.', 'red');
+                return;
+            }
+
+            const nama = namaInput.value.trim();
+            const shift = shiftSelect.value;
+
+            if (!nama || !shift) {
+                showMessage('Nama Karyawan dan Shift wajib diisi!', 'red');
+                return;
+            }
+
+            showMessage('Melanjutkan Clock-In...', 'blue');
+
+            try {
+                // Cek Status Terbuka
+                const qCheck = query(
+                    collection(db, PUBLIC_COLLECTION_PATH),
+                    where('nama', '==', nama),
+                    where('shift', '==', shift),
+                    where('keluar', '==', null)
+                );
+
+                const snapshot = await getDocs(qCheck);
+
+                if (snapshot.size > 0) {
+                    showMessage(`Karyawan ${nama} sudah Clock-In untuk shift ${shift} dan belum Clock-Out.`, 'orange');
+                    return;
+                }
+
+                // Tambahkan dokumen baru ke koleksi publik
+                await addDoc(collection(db, PUBLIC_COLLECTION_PATH), {
+                    nama: nama,
+                    shift: shift,
+                    masuk: serverTimestamp(),
+                    keluar: null,
+                    userId: userId, 
+                    createdAt: serverTimestamp()
+                });
+
+                showMessage(`Clock-In Shift ${shift} untuk ${nama} berhasil!`, 'green');
+                checkFormStatus(); 
+            } catch (error) {
+                console.error("Gagal Clock-In:", error);
+                showMessage(`Gagal Clock-In. ${error.message}`, 'red');
+            }
+        };
+
+        // Fungsi Clock-Out (Keluar)
+        const handleClockOut = async () => {
+            if (!isAuthReady || !userId) {
+                showMessage('Harap tunggu autentikasi selesai.', 'red');
+                return;
+            }
+
+            const nama = namaInput.value.trim();
+            const shift = shiftSelect.value;
+
+            if (!nama || !shift) {
+                showMessage('Nama Karyawan dan Shift wajib diisi!', 'red');
+                return;
+            }
+            
+            try {
+                // Cari catatan absensi terakhir yang belum Clock-Out untuk karyawan ini
+                const qFindOpen = query(
+                    collection(db, PUBLIC_COLLECTION_PATH),
+                    where('nama', '==', nama),
+                    where('shift', '==', shift),
+                    where('keluar', '==', null)
+                );
+
+                const snapshot = await getDocs(qFindOpen);
+
+
+                if (snapshot.empty) {
+                    showMessage(`Tidak ada catatan Clock-In terbuka untuk ${nama} shift ${shift}. Silakan Clock-In terlebih dahulu.`, 'red');
+                    checkFormStatus();
+                    return;
+                }
+
+                // Ambil dokumen pertama yang ditemukan (yang terbaru)
+                const docToUpdate = snapshot.docs[0];
+
+                // Update dokumen di koleksi publik
+                await updateDoc(doc(db, PUBLIC_COLLECTION_PATH, docToUpdate.id), {
+                    keluar: serverTimestamp()
+                });
+
+                showMessage(`Clock-Out Shift ${shift} untuk ${nama} berhasil!`, 'green');
+                
+                // Clear form dan perbarui status tombol
+                namaInput.value = '';
+                shiftSelect.value = '';
+                checkFormStatus(); 
+
+            } catch (error) {
+                console.error("Gagal Clock-Out:", error);
+                showMessage(`Gagal Clock-Out. ${error.message}`, 'red');
+            }
+        };
+
+        // Fungsi HAPUS Data (Hanya untuk Admin)
+        const handleDelete = async (docId, nama) => {
+            if (!isAdmin) {
+                showMessage('Akses ditolak. Hanya admin yang dapat menghapus data.', 'red');
+                return;
+            }
+
+            // Pengganti window.confirm() dengan konfirmasi sederhana
+            // NOTE: Kami menggunakan window.confirm karena tidak dapat membuat modal kustom yang kompleks tanpa membuat UI menjadi rumit
+            if (window.confirm(`Yakin ingin menghapus catatan absensi ${nama}? Tindakan ini tidak dapat dibatalkan.`)) {
+                try {
+                    await deleteDoc(doc(db, PUBLIC_COLLECTION_PATH, docId));
+                    showMessage(`Catatan absensi ${nama} berhasil dihapus.`, 'green');
+                } catch (error) {
+                    console.error("Gagal menghapus dokumen:", error);
+                    showMessage(`Gagal menghapus. ${error.message}`, 'red');
+                }
+            }
+        };
+
+
+        // Fungsi CETAK Data (berdasarkan data yang terlihat di tabel)
+        const handlePrintData = () => {
+            const tableContainer = document.getElementById('absensiTableContainer');
+            
+            if (absensiListEl.children.length === 0 || (absensiListEl.children.length === 1 && absensiListEl.children[0].children[0].colSpan > 4)) {
+                showMessage('Tidak ada data yang tersedia di tabel untuk dicetak.', 'orange');
+                return;
+            }
+
+            const printContent = tableContainer.cloneNode(true);
+            
+            // Hapus kolom Aksi jika ada sebelum mencetak
+            const printTable = printContent.querySelector('#absensiTable');
+            const thAksi = printTable.querySelector('#aksiHeader');
+            if (thAksi && !thAksi.classList.contains('hidden')) {
+                thAksi.remove();
+                printTable.querySelectorAll('.no-print').forEach(el => el.remove());
+                
+                // Hapus tombol hapus dari baris data
+                printTable.querySelectorAll('.btn-delete').forEach(btn => btn.closest('td').remove());
+
+                // Setelah menghapus kolom 'Aksi', kita perlu memastikan baris data memiliki jumlah sel yang benar.
+                // Jika tadinya 6 kolom (5 data + 1 aksi), sekarang harus menjadi 5.
+                printTable.querySelectorAll('tbody tr').forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length === 6) {
+                        cells[5].remove(); // Hapus sel terakhir (yang tadinya Aksi)
+                    }
+                });
+            }
+
+
+            // Adjust styles for printing
+            printContent.style.overflowX = 'visible';
+            printContent.style.maxHeight = 'none';
+            printContent.style.boxShadow = 'none';
+            printContent.style.border = 'none';
+
+            // Create print header
+            const printDate = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const shiftFilter = filterShiftEl.value;
+
+            const printHeader = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="font-size: 1.5rem; font-weight: bold; color: #333;">LAPORAN ABSENSI JAGA STAND DINKES</h1>
+                    <p style="font-size: 0.9rem; color: #666;">Data Dicetak pada: ${printDate}</p>
+                    <p style="font-size: 0.8rem; color: #666; margin-top: 5px;">Filter Tampilan: Shift='${shiftFilter}'</p>
+                </div>
+            `;
+
+            const printWindow = window.open('', '_blank');
+
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Laporan Absensi (${printDate})</title>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+                        body { 
+                            font-family: 'Inter', sans-serif;
+                            margin: 20px;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                        }
+                        th, td {
+                            border: 1px solid #ccc;
+                            padding: 8px;
+                            text-align: left;
+                            font-size: 10pt;
+                        }
+                        thead {
+                            background-color: #f2f2f2;
+                            -webkit-print-color-adjust: exact;
+                            color-adjust: exact;
+                        }
+                        /* Tailwind classes for row styling */
+                        .text-gray-400 { color: #9ca3af; }
+                        .text-green-600 { color: #059669; }
+                        .text-red-600 { color: #dc2626; }
+                        .italic { font-style: italic; }
+                        .font-semibold { font-weight: 600; }
+                        .bg-yellow-100 { background-color: #fef3c7; }
+                        .text-yellow-800 { color: #92400e; }
+                        .bg-blue-100 { background-color: #dbeafe; }
+                        .text-blue-800 { color: #1e40af; }
+                        .rounded-full { border-radius: 9999px; padding: 1px 8px; }
+                        .inline-flex { display: inline-flex; }
+                        .leading-5 { line-height: 1.25rem; }
+                        .whitespace-nowrap { white-space: nowrap; }
+                        .text-xs { font-size: 0.75rem; }
+                        .text-sm { font-size: 0.875rem; }
+                    </style>
+                </head>
+                <body>
+                    ${printHeader}
+                    ${printContent.outerHTML}
+                </body>
+                </html>
+            `);
+
+            printWindow.document.close();
+            printWindow.focus();
+            
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+        };
+
+
+        // Mengecek status form untuk mengaktifkan/menonaktifkan tombol
+        const checkFormStatus = async () => {
+            const nama = namaInput.value.trim();
+            const shift = shiftSelect.value;
+            
+            // Nonaktifkan semua tombol jika belum terautentikasi atau form belum lengkap
+            if (!nama || !shift || !isAuthReady) {
+                btnMasuk.disabled = true;
+                btnKeluar.disabled = true;
+                return;
+            }
+
+            try {
+                // Cek status Clock-In terakhir di koleksi publik
+                const qCheck = query(
+                    collection(db, PUBLIC_COLLECTION_PATH),
+                    where('nama', '==', nama),
+                    where('shift', '==', shift),
+                    where('keluar', '==', null) // Cari yang belum keluar
+                );
+
+                const snapshot = await getDocs(qCheck);
+
+                if (snapshot.size > 0) {
+                    // Sudah Clock-In dan belum Clock-Out
+                    btnMasuk.disabled = true;
+                    btnKeluar.disabled = false;
+                } else {
+                    // Belum Clock-In
+                    btnMasuk.disabled = false;
+                    btnKeluar.disabled = true;
+                }
+            } catch (error) {
+                console.error("Gagal memeriksa status absensi:", error);
+                btnMasuk.disabled = true;
+                btnKeluar.disabled = true;
+            }
+        };
+
+        // Fungsi Logout Admin
+        const handleAdminLogout = () => {
+            isAdmin = false;
+            showMessage('Logout Admin berhasil. Kolom Aksi disembunyikan.', 'gray');
+            updateAdminButtonUI();
+            
+            // Paksa render ulang tabel untuk menyembunyikan kolom Aksi
+            if (db) setupRealtimeListener(); 
+        }
+
+        // Fungsi Login Admin
+        const handleAdminLogin = (e) => {
+            e.preventDefault();
+            const passwordInput = document.getElementById('adminPassword');
+            const password = passwordInput.value.trim();
+
+            if (password === ADMIN_PASSWORD) {
+                isAdmin = true;
+                loginModal.classList.add('hidden');
+                passwordInput.value = ''; // Kosongkan password
+                
+                showMessage('Login Admin berhasil! Kolom Aksi sekarang terlihat.', 'green');
+                updateAdminButtonUI();
+
+                // Paksa render ulang tabel untuk menampilkan kolom Aksi
+                if (db) setupRealtimeListener(); 
+            } else {
+                showMessage('Password Admin salah.', 'red');
+                passwordInput.value = ''; // Kosongkan password
+            }
+        };
+
+        // Listener Global untuk Tombol Admin (Login/Logout)
+        adminAuthBtn.addEventListener('click', () => {
+            if (isAdmin) {
+                // Jika sudah login, lakukan logout
+                handleAdminLogout();
+            } else {
+                // Jika belum login, tampilkan modal login
+                loginModal.classList.remove('hidden');
+                document.getElementById('adminPassword').focus();
+            }
+        });
+
+
+        // Listener Event
+        btnMasuk.addEventListener('click', handleClockIn);
+        btnKeluar.addEventListener('click', handleClockOut);
+        btnCetak.addEventListener('click', handlePrintData); 
+        
+        filterShiftEl.addEventListener('change', () => {
+             if (isAuthReady) {
+                setupRealtimeListener(); 
+             }
+        });
+        
+        // Listener form input (untuk mengaktifkan/menonaktifkan tombol)
+        absensiForm.addEventListener('input', checkFormStatus);
+
+        // Listener Modal Login
+        closeModalBtn.addEventListener('click', () => {
+            loginModal.classList.add('hidden');
+        });
+
+        loginForm.addEventListener('submit', handleAdminLogin);
+
+
+        // Inisialisasi aplikasi saat DOM siap
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            initFirebase();
+            updateAdminButtonUI(); // Setel tampilan awal tombol admin
+        });
+    </script>
+</body>
+</html>
