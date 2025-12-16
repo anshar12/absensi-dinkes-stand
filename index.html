@@ -14,7 +14,6 @@
             font-family: 'Inter', sans-serif;
             background-color: #f7f7f9;
         }
-        /* Custom scrollbar for better look */
         #absensiTableContainer::-webkit-scrollbar {
             width: 8px;
         }
@@ -22,7 +21,6 @@
             background-color: #9ca3af;
             border-radius: 4px;
         }
-        /* Style for print mode */
         @media print {
             .no-print, #adminAuthBtn {
                 display: none;
@@ -59,17 +57,14 @@
                     Memuat status pengguna...
                 </p>
             </div>
-            <!-- Tombol Login/Logout Admin -->
             <button id="adminAuthBtn" class="bg-indigo-600 text-white text-xs font-semibold py-2 px-3 rounded-lg hover:bg-indigo-700 transition duration-200 shadow-md flex items-center">
                 <i data-lucide="shield" class="w-4 h-4 mr-1"></i>
                 Login Admin
             </button>
         </header>
 
-        <!-- Form Pencatatan Absensi & Aksi -->
         <section class="mb-8 p-6 bg-indigo-50 border border-indigo-200 rounded-lg no-print">
             <h2 class="text-xl font-semibold text-indigo-800 mb-2">Absen Dulu....... </h2>
-            <!-- Catatan/Peringatan Baru Sesuai Permintaan User -->
             <p class="text-sm text-indigo-700 italic mb-4 flex items-center">
                 <i data-lucide="alert-triangle" class="w-4 h-4 mr-1 text-indigo-600"></i> 
                 Catatan: Mohon absen (Masuk/Keluar) sesuai dengan jam shift yang berlaku ya, Kak.
@@ -77,25 +72,20 @@
             
             <form id="absensiForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-                <!-- Input Nama -->
                 <div class="col-span-1">
                     <label for="nama" class="block text-sm font-medium text-gray-700">Nama Karyawan</label>
                     <input type="text" id="nama" name="nama" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
                 </div>
 
-                <!-- Pilihan Shift -->
                 <div class="col-span-1">
                     <label for="shift" class="block text-sm font-medium text-gray-700">Pilih Shift</label>
                     <select id="shift" name="shift" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
                         <option value="">-- Pilih Shift --</option>
                         <option value="Sore">Sore (15:00 - 18:00)</option>
                         <option value="Malam">Malam (19:00 - 22:00)</option>
-                        
                     </select>
-                    
                 </div>
             
-                <!-- Tombol Aksi (Masuk, Keluar, Cetak) -->
                 <div class="col-span-1 flex items-end space-x-2">
                     <button type="button" id="btnMasuk" class="w-1/3 bg-green-600 text-white text-sm font-semibold py-3 px-1 rounded-lg hover:bg-green-700 transition duration-200 shadow-md flex items-center justify-center disabled:opacity-50" disabled>
                         <i data-lucide="log-in" class="w-4 h-4 mr-1"></i>
@@ -114,14 +104,12 @@
             <p id="message" class="mt-4 text-sm font-medium text-gray-700"></p>
         </section>
 
-        <!-- Bagian Filter dan Tabel Riwayat Absensi -->
         <section class="mb-6">
             <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
                 <i data-lucide="database" class="w-6 h-6 mr-2 text-indigo-600"></i>
                 Riwayat Absensi 
             </h2>
 
-            <!-- Filter Shift -->
             <div class="mb-4 flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 no-print">
                 <span class="text-sm font-medium text-gray-700">Filter Tampilan Shift:</span>
                 <select id="filterShift" class="rounded-md border-gray-300 shadow-sm p-2 border focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
@@ -129,13 +117,11 @@
                     <option value="Sore">Shift Sore</option>
                     <option value="Malam">Shift Malam</option>
                 </select>
-                <!-- Menampilkan ID Otentikasi untuk akses data bersama -->
                 <div id="user-id-display" class="text-sm text-gray-600 bg-gray-100 p-2 rounded-md truncate">
                     ID Otentikasi: <span id="current-user-id"></span>
                 </div>
             </div>
 
-            <!-- Tabel Absensi -->
             <div id="absensiTableContainer" class="overflow-x-auto max-h-96 relative shadow-lg rounded-lg border">
                 <table id="absensiTable" class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50 sticky top-0 sticky-header">
@@ -145,12 +131,10 @@
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Masuk</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keluar</th>
-                            <!-- Kolom Aksi (Hanya muncul jika admin) -->
                             <th id="aksiHeader" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden no-print">Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="absensiList" class="bg-white divide-y divide-gray-200">
-                        <!-- Data akan diisi oleh JavaScript -->
                         <tr>
                             <td colspan="5" class="p-4 text-center text-gray-500">Memuat data absensi...</td>
                         </tr>
@@ -181,7 +165,6 @@
             </form>
         </div>
     </div>
-    <!-- END MODAL LOGIN ADMIN -->
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -190,47 +173,61 @@
         import { getFirestore, doc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, setLogLevel, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ====================================================================
-        // KONFIGURASI FIREBASE (Loading Asinkronus)
+        // !!! KONFIGURASI PENTING UNTUK DEPLOYMENT !!!
         // ====================================================================
+        
+        /* * CATATAN PENTING:
+         * Variabel global "__app_id", "__firebase_config", dan "__initial_auth_token" 
+         * HANYA ADA DI LINGKUNGAN EDITOR CANVAS INI.
+         * JIKA ANDA MENJALANKAN FILE INI DI GITHUB ATAU LOKAL, ANDA HARUS 
+         * MENGGANTI NILAI FALLBACK DI BAWAH DENGAN KONFIGURASI PROYEK 
+         * FIREBASE ANDA YANG SEBENARNYA. 
+        */
 
+        // Placeholder/Default Values (GANTI INI JIKA DEPLOY KE GITHUB)
+        const FALLBACK_CONFIG = {
+            apiKey: "AIzaSyDPp4IeriXx2m-NpfxAJrxDd-pE2YqBef4", 
+            authDomain: "absensi-dinkes-stand.firebaseapp.com", // Cth: "your-project-id.firebaseapp.com"
+            projectId: "absensi-dinkes-stand",
+            storageBucket: "absensi-dinkes-stand.firebasestorage.app",
+            messagingSenderId: "458172993222",
+            appId: "1:458172993222:web:e3d29d93b5284e04df11c7"
+            measurementId: "G-FE5XXDBDPM"
+        };
+        
         let firebaseConfig = {};
-        const DUMMY_API_KEY = "AIzaSyDPp4IeriXx2m-NpfxAJrxDd-pE2YqBef4"; 
-        const DUMMY_AUTH_DOMAIN = "example-app.firebaseapp.com"; // Placeholder generik
-        const DUMMY_PROJECT_ID = "default-project-id";
+        let initialAuthToken = null;
+        let currentAppId = FALLBACK_CONFIG.projectId;
 
-        // Coba memuat konfigurasi dari variabel global
+        // Coba memuat konfigurasi dari variabel global Canvas
         try {
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
                 firebaseConfig = JSON.parse(__firebase_config);
-                console.log("SUCCESS: __firebase_config berhasil diparse.");
+                console.log("Canvas: __firebase_config berhasil diparse.");
             } else {
-                 console.warn("WARNING: Variabel __firebase_config tidak ditemukan.");
+                 console.warn("Canvas: Variabel __firebase_config tidak ditemukan. Menggunakan Fallback Config.");
+                 firebaseConfig = FALLBACK_CONFIG;
             }
+            
+            // Ambil variabel Canvas lainnya
+            currentAppId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
+            initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
         } catch (e) {
-            console.error("ERROR: Gagal parsing __firebase_config:", e);
+            console.error("ERROR: Gagal parsing konfigurasi. Menggunakan Fallback Config.", e);
+            firebaseConfig = FALLBACK_CONFIG;
         }
 
-        // Memastikan konfigurasi minimal ada, menggunakan fallback jika hilang
-        firebaseConfig.apiKey = firebaseConfig.apiKey || DUMMY_API_KEY;
-        firebaseConfig.authDomain = firebaseConfig.authDomain || DUMMY_AUTH_DOMAIN;
-        firebaseConfig.projectId = firebaseConfig.projectId || DUMMY_PROJECT_ID;
-
-        // Ambil app ID dan token dari variabel global
-        const currentAppId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // Menetapkan jalur koleksi publik
-        const PUBLIC_COLLECTION_PATH = `artifacts/${currentAppId}/public/data/absensi_shifts`;
-
-        // Kata sandi admin sederhana (HANYA UNTUK DEMO)
+        // Final Check and Assignment
         const ADMIN_PASSWORD = 'dinkes123'; 
+        const PUBLIC_COLLECTION_PATH = `artifacts/${currentAppId}/public/data/absensi_shifts`;
 
         let db;
         let app;
         let auth;
         let userId = null;
         let isAuthReady = false;
-        let isAdmin = false; // Status admin
+        let isAdmin = false; 
 
         // Elemen UI
         const currentUserIdEl = document.getElementById('current-user-id');
@@ -244,41 +241,38 @@
         const filterShiftEl = document.getElementById('filterShift');
         const namaInput = document.getElementById('nama');
         const shiftSelect = document.getElementById('shift');
-        
-        // Elemen Admin
         const adminAuthBtn = document.getElementById('adminAuthBtn'); 
         const loginModal = document.getElementById('loginModal');
         const loginForm = document.getElementById('loginForm');
         const closeModalBtn = document.getElementById('closeModalBtn');
         const aksiHeader = document.getElementById('aksiHeader');
 
+        // ====================================================================
+        // FUNGSI INITIATION & AUTHENTICATION
+        // ====================================================================
 
-        // Fungsi inisialisasi Firebase
         const initFirebase = async () => {
             try {
                 // LOGGING DETAIL KONFIGURASI SEBELUM INIT
                 console.log("--- Firebase Initialization Details ---");
-                console.log("Config (API Key):", firebaseConfig.apiKey ? "Ditemukan/Fallback" : "HILANG");
+                console.log("Config (API Key):", firebaseConfig.apiKey.substring(0, 10) + '...');
                 console.log("Config (Auth Domain):", firebaseConfig.authDomain);
-                console.log("App ID:", currentAppId);
-                console.log("Initial Auth Token Status:", initialAuthToken ? "Ditemukan" : "HILANG");
+                console.log("App ID (for collection path):", currentAppId);
+                console.log("Initial Auth Token Status:", initialAuthToken ? "Ditemukan (Canvas)" : "HILANG (Eksternal)");
+                console.log("Collection Path:", PUBLIC_COLLECTION_PATH);
                 console.log("---------------------------------------");
-
-                // 1. Inisialisasi Aplikasi
+                
+                // PENTING: Harus memiliki authDomain yang valid di firebaseConfig
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
-                
-                // 2. Inisialisasi Otentikasi
-                // getAuth() memerlukan authDomain yang valid.
                 auth = getAuth(app); 
-                console.log("SUCCESS: getAuth() dipanggil berhasil.");
+                console.log("SUCCESS: getAuth() berhasil dipanggil.");
 
-                // 3. Dengarkan perubahan status otentikasi
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         userId = user.uid;
                         currentUserIdEl.textContent = userId;
-                        authStatusEl.textContent = `Status: Terhubung ke Firebase (ID: ${userId})`;
+                        authStatusEl.textContent = `Status: Terhubung ke Firebase (ID: ${userId.substring(0, 8)}...)`;
                         isAuthReady = true;
                         btnCetak.disabled = false; 
                         console.log("Pengguna terautentikasi. Memuat data publik...");
@@ -287,28 +281,29 @@
                     } else {
                         userId = null;
                         currentUserIdEl.textContent = 'N/A';
-                        authStatusEl.textContent = 'Status: Auth Gagal. Mencoba masuk ulang...';
                         isAuthReady = false;
                         
-                        // 4. Pemicu Otentikasi Awal/Ulang jika belum ada user
+                        // Otentikasi Awal/Ulang
                         try {
+                            authStatusEl.textContent = initialAuthToken ? 
+                                'Status: Auth Gagal. Mencoba masuk menggunakan Custom Token...' :
+                                'Status: Auth Gagal. Mencoba masuk secara Anonim...';
+                                
                             if (initialAuthToken) {
                                 await signInWithCustomToken(auth, initialAuthToken);
-                                console.log("Otentikasi awal/ulang berhasil menggunakan Custom Token.");
                             } else {
                                 await signInAnonymously(auth);
-                                console.log("Otentikasi awal/ulang berhasil menggunakan Anonim.");
                             }
                         } catch(reauthError) {
                              console.error("ERROR: Gagal otentikasi awal/ulang:", reauthError);
-                             authStatusEl.textContent = `ERROR: Gagal otentikasi. (${reauthError.code}). Cek konfigurasi/koneksi.`;
+                             authStatusEl.textContent = `ERROR: Gagal otentikasi. (${reauthError.code}). PASTIKAN KONFIGURASI SUDAH BENAR!`;
                         }
                     }
                 });
                 
             } catch (error) {
-                console.error("FATAL ERROR: Kesalahan inisialisasi Firebase:", error);
-                authStatusEl.textContent = `FATAL ERROR: Gagal inisialisasi (${error.message}). Cek Konsol untuk detail Konfigurasi.`;
+                console.error("FATAL ERROR: Kesalahan inisialisasi Firebase. Cek konfigurasi:", error);
+                authStatusEl.textContent = `FATAL ERROR: Gagal inisialisasi (${error.message}). Cek Konsol!`;
                 btnMasuk.disabled = true;
                 btnKeluar.disabled = true;
                 btnCetak.disabled = true;
@@ -316,7 +311,7 @@
         };
 
         // ====================================================================
-        // FUNGSI UMUM & UI (Tidak Berubah dari versi sebelumnya, tapi disertakan untuk kelengkapan)
+        // FUNGSI UTILITY & FIREBASE (Tidak ada perubahan logika utama)
         // ====================================================================
 
         const formatTimestamp = (timestamp) => {
@@ -559,7 +554,8 @@
                  return;
             }
 
-            if (confirm(`Yakin ingin menghapus catatan absensi ${nama}? Tindakan ini tidak dapat dibatalkan.`)) {
+            // Ganti confirm() dengan fungsi kustom di lingkungan nyata (saat ini tetap pakai confirm agar cepat)
+            if (window.confirm(`Yakin ingin menghapus catatan absensi ${nama}? Tindakan ini tidak dapat dibatalkan.`)) {
                 try {
                     await deleteDoc(doc(db, PUBLIC_COLLECTION_PATH, docId));
                     showMessage(`Catatan absensi ${nama} berhasil dihapus.`, 'green');
@@ -570,9 +566,9 @@
             }
         };
 
-
         const handlePrintData = () => {
-            const tableContainer = document.getElementById('absensiTableContainer');
+             // ... (Fungsi print tetap sama)
+             const tableContainer = document.getElementById('absensiTableContainer');
             
             if (absensiListEl.children.length === 0 || (absensiListEl.children.length === 1 && absensiListEl.children[0].children[0].colSpan > 4)) {
                 showMessage('Tidak ada data yang tersedia di tabel untuk dicetak.', 'orange');
@@ -673,7 +669,6 @@
                 printWindow.print();
             }, 500);
         };
-
 
         const checkFormStatus = async () => {
             const nama = namaInput.value.trim();
